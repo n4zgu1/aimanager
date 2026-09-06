@@ -1,0 +1,14 @@
+[Unit]
+Description=AI Model Manager Service
+After=network.target
+
+[Service]
+Type=simple
+User=tl0
+WorkingDirectory=/home/tl0/projects/aimanager
+ExecStart=/usr/bin/python3 /home/tl0/projects/aimanager/app.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

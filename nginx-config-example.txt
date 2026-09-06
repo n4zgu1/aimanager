@@ -1,0 +1,28 @@
+# Example nginx configuration for AI Model Manager
+# This matches the live config at /etc/nginx/sites-available/aimanager
+# Add the /aimanager location to your server block (or the default_server block
+# so it works regardless of which Host/IP is used to reach the box).
+# Then test with: sudo nginx -t && sudo systemctl reload nginx
+
+server {
+    listen 80;
+    server_name _;
+
+    # Forward requests to the AI Model Manager API (port 22345)
+    # NOTE: no trailing slash on proxy_pass, so the /aimanager path is preserved
+    location /aimanager {
+        proxy_pass http://localhost:22345;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Redirect root to the AIMANAGER UI
+    # IMPORTANT: do NOT add a "location = /aimanager { return 301 ... }" block.
+    # The backend canonicalizes the trailing slash; adding an nginx-level
+    # redirect there causes a 301 <-> 307 redirect loop.
+    location = / {
+        return 302 /aimanager/;
+    }
+}

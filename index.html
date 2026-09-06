@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Model Manager</title>
+    <style>
+        :root {
+            --bg: #f5f5f5;
+            --container-bg: #ffffff;
+            --text: #333333;
+            --muted: #666666;
+            --border: #dddddd;
+            --header-bg: #f2f2f2;
+            --btn-primary-bg: #4CAF50;
+            --btn-primary-hover: #45a049;
+            --btn-unload-bg: #dc3545;
+            --btn-unload-hover: #c82333;
+            --select-bg: #ffffff;
+            --shadow: rgba(0,0,0,0.1);
+            --modal-bg: #ffffff;
+            --row-hover: #f0f0f0;
+        }
+        [data-theme="dark"] {
+            --bg: #121212;
+            --container-bg: #1e1e1e;
+            --text: #e0e0e0;
+            --muted: #aaaaaa;
+            --border: #444444;
+            --header-bg: #2a2a2a;
+            --btn-primary-bg: #2e7d32;
+            --btn-primary-hover: #388e3c;
+            --btn-unload-bg: #b71c1c;
+            --btn-unload-hover: #c62828;
+            --select-bg: #2a2a2a;
+            --shadow: rgba(0,0,0,0.5);
+            --modal-bg: #2a2a2a;
+            --row-hover: #333333;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--bg);
+            color: var(--text);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        .container {
+            background-color: var(--container-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px var(--shadow);
+            transition: background-color 0.3s ease;
+        }
+        h2 {
+            margin-top: 30px;
+        }
+        .model-list {
+            margin-top: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background-color: var(--header-bg);
+        }
+        tr:nth-child(even) {
+            background-color: var(--select-bg);
+        }
+        tbody tr {
+            cursor: pointer;
+        }
+        tbody tr:hover {
+            background-color: var(--row-hover);
+        }
+        tbody tr.row-loaded {
+            background-color: #2d4a2d;
+        }
+        tbody tr.row-loaded:hover {
+            background-color: #37603a;
+        }
+        tbody tr.row-loaded-r9700 {
+            background-color: #4a2d2d;
+        }
+        tbody tr.row-loaded-r9700:hover {
+            background-color: #603437;
+        }
+        .terminal {
+            margin-top: 30px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            overflow: hidden;
+            font-family: 'Courier New', Consolas, Menlo, monospace;
+        }
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #161b22;
+            padding: 8px 12px;
+            color: #8b949e;
+            font-size: 13px;
+        }
+        .terminal-dots {
+            display: flex;
+            gap: 6px;
+        }
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .dot.red { background-color: #ff5f56; }
+        .dot.yellow { background-color: #ffbd2e; }
+        .dot.green { background-color: #27c93f; }
+        .terminal-cmd {
+            flex: 1;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .terminal-status {
+            font-size: 12px;
+            color: #8b949e;
+            white-space: nowrap;
+        }
+        .terminal-status.live {
+            color: #27c93f;
+        }
+        .terminal-status.offline {
+            color: #ff5f56;
+        }
+        .terminal-body {
+            margin: 0;
+            padding: 10px 12px;
+            color: #c9d1d9;
+            font-size: 13px;
+            line-height: 1.5;
+            height: 42vh;
+            min-height: 260px;
+            max-height: 480px;
+            overflow-y: auto;
+            white-space: pre;
+        }
+        .terminal-body::after {
+            content: "▊";
+            color: #27c93f;
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal {
+            background-color: var(--modal-bg);
+            color: var(--text);
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px var(--shadow);
+            max-width: 420px;
+            width: 90%;
+            text-align: center;
+        }
+        .modal p {
+            margin: 0 0 20px;
+            font-size: 16px;
+            word-break: break-all;
+        }
+        .modal .actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .modal button {
+            padding: 10px 20px;
+            font-size: 15px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            color: white;
+        }
+        .modal .btn-confirm-load {
+            background-color: var(--btn-primary-bg);
+        }
+        .modal .btn-confirm-load:hover {
+            background-color: var(--btn-primary-hover);
+        }
+        .modal .btn-confirm-unload {
+            background-color: var(--btn-unload-bg);
+        }
+        .modal .btn-confirm-unload:hover {
+            background-color: var(--btn-unload-hover);
+        }
+        .modal .btn-cancel {
+            background-color: var(--header-bg);
+            color: var(--text);
+        }
+        .modal .btn-cancel:hover {
+            filter: brightness(1.1);
+        }
+        .modal.loading .actions,
+        .modal.loading p {
+            display: none;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 20px;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+            z-index: 1100;
+            box-shadow: 0 2px 10px var(--shadow);
+            max-width: 90%;
+        }
+        .toast.success { background-color: var(--btn-primary-bg); }
+        .toast.error { background-color: var(--btn-unload-bg); }
+        .toast.info { background-color: var(--muted); }
+        .fan-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .fan-row input[type="range"] {
+            flex: 1;
+            min-width: 150px;
+        }
+        .fan-row button {
+            padding: 8px 16px;
+            font-size: 14px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            color: white;
+            background-color: var(--btn-primary-bg);
+        }
+        .fan-row button:hover {
+            background-color: var(--btn-primary-hover);
+        }
+        .fan-row .btn-fan-reset {
+            background-color: var(--muted);
+        }
+        .fan-row .btn-fan-reset:hover {
+            filter: brightness(1.1);
+        }
+        .header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .btn-open-webui {
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            white-space: nowrap;
+        }
+        .btn-open-webui:hover {
+            background-color: #0069d9;
+        }
+        .clear-vram {
+            margin-top: 30px;
+            text-align: center;
+        }
+        .clear-vram button {
+            width: 33.33%;
+            padding: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            border: 1px solid var(--btn-unload-bg);
+            background-color: var(--btn-unload-bg);
+            color: white;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .clear-vram button:hover {
+            background-color: var(--btn-unload-hover);
+        }
+        h3 {
+            margin-top: 20px;
+        }
+        .updated-muted {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: normal;
+        }
+        .cell-center {
+            text-align: center;
+        }
+        .util-low { color: #4caf50; }
+        .util-med { color: #ffb300; }
+        .util-high { color: #ff5252; font-weight: bold; }
+        .temp-high { color: #ff5252; font-weight: bold; }
+        .throttle-on { color: #ff5252; font-weight: bold; }
+        #gpuTable th, #gpuTable td {
+            white-space: nowrap;
+        }
+        .table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .toggle-head {
+            cursor: pointer;
+            user-select: none;
+        }
+        .toggle-head::before {
+            content: "▸ ";
+            display: inline-block;
+            color: var(--muted);
+            transition: transform 0.2s ease;
+        }
+        .toggle-head.expanded::before {
+            content: "▾ ";
+        }
+        .toggle-head:hover {
+            opacity: 0.8;
+        }
+        .toggle-head .updated-muted {
+            display: block;
+            margin-top: 2px;
+            padding-left: 18px;
+        }
+        .server-temps {
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+        .header-row {
+            gap: 10px;
+        }
+        @media (max-width: 768px) {
+            body {
+                padding: 8px;
+            }
+            .container {
+                padding: 12px;
+            }
+            h2 {
+                font-size: 18px;
+                margin-top: 24px;
+            }
+            h3 {
+                font-size: 16px;
+            }
+            th, td {
+                padding: 6px;
+            }
+            .header-row {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .btn-open-webui {
+                align-self: flex-start;
+                width: auto;
+                padding: 8px 14px;
+                font-size: 13px;
+            }
+            .fan-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .fan-row input[type="range"] {
+                width: 100%;
+            }
+            .fan-row button {
+                width: 100%;
+            }
+            .clear-vram button {
+                width: 100%;
+                padding: 12px;
+            }
+            .terminal-body {
+                height: 35vh;
+                min-height: 200px;
+                max-height: 380px;
+            }
+            .modal {
+                width: 95%;
+                padding: 18px;
+            }
+
+            /* Stack tables into labeled cards on small screens */
+            .table-wrap {
+                overflow-x: visible;
+            }
+            .table-wrap table,
+            .table-wrap thead,
+            .table-wrap tbody,
+            .table-wrap tr,
+            .table-wrap td {
+                display: block;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .table-wrap thead {
+                display: none;
+            }
+            .table-wrap tbody tr {
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                margin-bottom: 10px;
+                padding: 2px 8px;
+            }
+            .table-wrap tbody tr:nth-child(even) {
+                background-color: transparent;
+            }
+            .table-wrap tbody tr:hover {
+                background-color: var(--row-hover);
+            }
+            .table-wrap tbody tr.row-loaded {
+                background-color: #2d4a2d;
+            }
+            .table-wrap tbody tr.row-loaded:hover {
+                background-color: #37603a;
+            }
+            .table-wrap tbody tr.row-loaded-r9700 {
+                background-color: #4a2d2d;
+            }
+            .table-wrap tbody tr.row-loaded-r9700:hover {
+                background-color: #603437;
+            }
+            .table-wrap td {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 12px;
+                border-bottom: 1px solid var(--border);
+                padding: 7px 4px;
+                white-space: normal !important;
+                word-break: break-word;
+            }
+            .table-wrap td:last-child {
+                border-bottom: none;
+            }
+            .table-wrap td[data-label]::before {
+                content: attr(data-label);
+                font-weight: bold;
+                color: var(--muted);
+                flex-shrink: 0;
+                padding-right: 8px;
+            }
+            .table-wrap td:not([data-label]) {
+                display: block;
+                text-align: center;
+            }
+            .table-wrap td.cell-center {
+                justify-content: space-between;
+            }
+        }
+
+        .card-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0 14px;
+            flex-wrap: wrap;
+        }
+        .card-btn {
+            padding: 8px 16px;
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            background: var(--select-bg);
+            color: var(--text);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .card-btn:hover {
+            border-color: var(--btn-primary-bg);
+        }
+        .card-btn.active {
+            background: var(--btn-primary-bg);
+            border-color: var(--btn-primary-bg);
+            color: #ffffff;
+        }
+        .card-btn[data-gpu="1"].active {
+            background: #c0392b;
+            border-color: #c0392b;
+        }
+        .card-select-hint {
+            color: var(--muted);
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-row">
+            <h2 style="margin-top: 0;">AI Model Manager</h2>
+            <a id="openWebUiBtn" class="btn-open-webui" href="#" target="_blank">Open WebUI</a>
+        </div>
+        <div class="model-list">
+            <h2 id="gpuToggle" class="toggle-head">GPU Status <span class="updated-muted" id="gpuUpdated"></span></h2>
+            <div class="table-wrap" id="gpuTableWrap">
+            <table id="gpuTable">
+                <thead>
+                    <tr>
+                        <th>GPU</th>
+                        <th>Name</th>
+                        <th>GFX Util</th>
+                        <th>VRAM (used/total)</th>
+                        <th>Temp Edge/Hotspot/Mem</th>
+                        <th>Power</th>
+                        <th>Fan</th>
+                        <th>Clocks GFX/Mem</th>
+                        <th>Throttle</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+            </div>
+            <h3 id="gpuProcToggle" class="toggle-head">GPU Processes</h3>
+            <div class="table-wrap" id="gpuProcTableWrap">
+            <table id="gpuProcTable">
+                <thead>
+                    <tr>
+                        <th>GPU</th>
+                        <th>PID</th>
+                        <th>Process</th>
+                        <th>GTT MEM</th>
+                        <th>VRAM MEM</th>
+                        <th>MEM USAGE</th>
+                        <th>CU %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+            </div>
+        </div>
+        <div class="model-list">
+            <h2>Currently Loaded</h2>
+            <div class="table-wrap">
+            <table id="loadedTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Size</th>
+                        <th>Card</th>
+                        <th>Processor</th>
+                        <th>Context</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+            </div>
+        </div>
+
+        <div class="model-list">
+            <h2>Available Models <span class="updated-muted" style="font-weight:normal;font-size:14px;">Load onto:</span></h2>
+            <div class="card-selector">
+                <button id="cardW7800" class="card-btn active" data-gpu="0">W7800 (48GB)</button>
+                <button id="cardR9700" class="card-btn" data-gpu="1">R9700 (32GB)</button>
+                <span class="card-select-hint">Click a model to load it onto the selected card</span>
+            </div>
+            <div class="table-wrap">
+            <table id="modelsTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Size (GB)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+            </div>
+        </div>
+
+        <div class="terminal">
+            <div class="terminal-header">
+                <span class="terminal-dots">
+                    <span class="dot red"></span>
+                    <span class="dot yellow"></span>
+                    <span class="dot green"></span>
+                </span>
+                <span class="terminal-cmd">$ sudo watch -n 1 amd-smi</span>
+                <span class="terminal-status" id="terminalStatus">connecting…</span>
+            </div>
+            <pre class="terminal-body" id="terminalBody">Waiting for output…</pre>
+        </div>
+
+        <div class="model-list">
+            <h2>GPU Fan Control</h2>
+            <p>Current: <span id="fanStatus">—</span></p>
+            <div class="fan-row">
+                <input type="range" id="fanSlider" min="0" max="100" value="50">
+                <span id="fanValue">50%</span>
+                <button id="fanApply" class="btn-fan">Set Fan</button>
+                <button id="fanReset" class="btn-fan-reset">Reset Curve</button>
+            </div>
+        </div>
+
+        <div class="model-list">
+            <h2>Server Fan Control</h2>
+            <p>Current: <span id="serverFanStatus">—</span></p>
+            <div class="fan-row">
+                <input type="range" id="serverFanSlider" min="0" max="100" value="50">
+                <span id="serverFanValue">50%</span>
+                <button id="serverFanApply" class="btn-fan">Set All Fans</button>
+                <button id="serverFanAuto" class="btn-fan-reset">Auto (BIOS)</button>
+            </div>
+            <p class="server-temps" id="serverTemps"></p>
+        </div>
+
+        <div class="clear-vram" id="clearVram">
+            <button id="clearVramBtn">Clear VRAM</button>
+        </div>
+    </div>
+
+    <div id="confirmOverlay" class="overlay" style="display:none">
+        <div class="modal" id="confirmModal">
+            <p id="confirmText"></p>
+            <div class="actions">
+                <button id="confirmYes" class="btn-confirm-load">Yes</button>
+                <button id="confirmNo" class="btn-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API served from /aimanager endpoints (same origin, works via nginx proxy)
+        const API_URL = "";
+
+        // Open WebUI URL. By default it points to the same host on port 8080;
+        // override OPEN_WEBUI_URL here if your instance lives elsewhere.
+        const OPEN_WEBUI_URL = "http://" + window.location.hostname + ":8080";
+        function initOpenWebUiButton() {
+            document.getElementById('openWebUiBtn').href = OPEN_WEBUI_URL;
+        }
+
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+        }
+
+        function getPreferredTheme() {
+            const saved = localStorage.getItem('aimanager-theme');
+            if (saved === 'dark' || saved === 'light') return saved;
+            return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+
+        // Apply theme on load (before the page paints) and on page load
+        applyTheme(getPreferredTheme());
+        window.addEventListener('load', () => applyTheme(getPreferredTheme()));
+        window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)')
+            .addEventListener('change', () => applyTheme(getPreferredTheme()));
+
+        let toastTimer = null;
+
+        function showToast(message, type = 'info') {
+            const el = document.getElementById('confirmOverlay');
+            let toast = document.querySelector('.toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.className = 'toast';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = message;
+            toast.className = `toast ${type}`;
+            toast.style.display = 'block';
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+
+        let confirmCallback = null;
+
+        // --- Card (GPU) selector ---
+        let selectedCardGpu = 0;
+        const CARD_LABEL = { 0: 'W7800', 1: 'R9700' };
+
+        function setSelectedCard(gpu) {
+            selectedCardGpu = gpu;
+            document.querySelectorAll('.card-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.gpu) === gpu);
+            });
+        }
+        document.querySelectorAll('.card-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                setSelectedCard(parseInt(btn.dataset.gpu));
+                showToast(`Selected card: ${CARD_LABEL[selectedCardGpu]}`, 'success');
+            });
+        });
+
+        function showConfirm(text, onYes, isUnload) {
+            document.getElementById('confirmText').textContent = text;
+            const yesBtn = document.getElementById('confirmYes');
+            yesBtn.className = isUnload ? 'btn-confirm-unload' : 'btn-confirm-load';
+            yesBtn.textContent = isUnload ? 'Unload' : 'Load';
+            confirmCallback = onYes;
+            document.getElementById('confirmOverlay').style.display = 'flex';
+        }
+
+        function closeConfirm() {
+            document.getElementById('confirmOverlay').style.display = 'none';
+            confirmCallback = null;
+        }
+
+        document.getElementById('confirmYes').addEventListener('click', () => {
+            const cb = confirmCallback;
+            closeConfirm();
+            if (cb) cb();
+        });
+        document.getElementById('confirmNo').addEventListener('click', closeConfirm);
+        document.getElementById('confirmOverlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeConfirm();
+        });
+
+        async function loadModel(model) {
+            try {
+                const response = await fetch(`${API_URL}/aimanager/load`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model, gpu: selectedCardGpu })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    const m = data.model;
+                    const msg = m
+                        ? `Loaded: ${m.name} on ${m.card || CARD_LABEL[selectedCardGpu]} | ${m.size} | ${m.processor} | ctx ${m.context}`
+                        : data.message || `Loaded: ${model}`;
+                    showToast(msg, 'success');
+                    fetchLoaded();
+                } else {
+                    showToast(`Error: ${data.detail || data.message}`, 'error');
+                }
+            } catch (error) {
+                showToast(`Network error: ${error}`, 'error');
+            }
+        }
+
+        async function unloadModel(model) {
+            try {
+                const response = await fetch(`${API_URL}/aimanager/unload`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model, gpu: selectedCardGpu })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    showToast(data.message || `Unloaded: ${model}`, 'success');
+                    fetchLoaded();
+                } else {
+                    showToast(`Error: ${data.detail || data.message}`, 'error');
+                }
+            } catch (error) {
+                showToast(`Network error: ${error}`, 'error');
+            }
+        }
+
+        function confirmLoad(model) {
+            showConfirm(`Load "${model}" onto ${CARD_LABEL[selectedCardGpu]} into VRAM?`, () => loadModel(model), false);
+        }
+
+        function confirmUnload(model) {
+            showConfirm(`Unload "${model}" from ${CARD_LABEL[selectedCardGpu]} VRAM?`, () => unloadModel(model), true);
+        }
+
+        const loadedNames = new Set();
+        const loadedCards = new Map();
+
+        function refreshLoadedRows() {
+            const rows = document.querySelectorAll('#modelsTable tbody tr');
+            rows.forEach(row => {
+                const name = row.dataset.modelName;
+                row.classList.remove('row-loaded', 'row-loaded-r9700');
+                if (name && loadedCards.get(name) === 'R9700') {
+                    row.classList.add('row-loaded-r9700');
+                } else if (name && loadedNames.has(name)) {
+                    row.classList.add('row-loaded');
+                }
+            });
+        }
+
+        async function fetchFan() {
+            try {
+                const response = await fetch(`${API_URL}/aimanager/fan`);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || "Failed to fetch fan status");
+                const status = document.getElementById('fanStatus');
+                const rpm = data.rpm !== null && data.rpm !== undefined ? `${data.rpm} RPM` : 'n/a';
+                const pwm = data.pwm !== null && data.pwm !== undefined ? `${data.pwm}%` : '';
+                status.textContent = rpm + (pwm ? `, PWM ${pwm}` : '');
+            } catch (error) {
+                document.getElementById('fanStatus').textContent = 'unavailable';
+            }
+        }
+
+        async function applyFan() {
+            const value = parseInt(document.getElementById('fanSlider').value, 10);
+            try {
+                const response = await fetch(`${API_URL}/aimanager/fan`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ percent: value })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    showToast(`Fan set to ${value}%`, 'success');
+                    fetchFan();
+                } else {
+                    showToast(`Error: ${data.detail || data.message}`, 'error');
+                }
+            } catch (error) {
+                showToast(`Network error: ${error}`, 'error');
+            }
+        }
+
+        async function resetFan() {
+            try {
+                const response = await fetch(`${API_URL}/aimanager/fan`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reset: true })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    showToast('Fan curve reset', 'success');
+                    fetchFan();
+                } else {
+                    showToast(`Error: ${data.detail || data.message}`, 'error');
+                }
+            } catch (error) {
+                showToast(`Network error: ${error}`, 'error');
+            }
+        }
+
+        document.getElementById('fanSlider').addEventListener('input', () => {
+            document.getElementById('fanValue').textContent = document.getElementById('fanSlider').value + '%';
+        });
+        document.getElementById('fanApply').addEventListener('click', applyFan);
+        document.getElementById('fanReset').addEventListener('click', resetFan);
+
+        async function applyServerFans() {
+            const value = parseInt(document.getElementById('serverFanSlider').value, 10);
+            try {
+                const response = await fetch(`${API_URL}/aimanager/serverfans`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ percent: value })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    const n = (data.results || []).length;
+                    showToast(`All server fans set to ${value}%` + (n ? ` (${n} fans)` : ''), 'success');
+                    fetchServerFans();
+                } else {
+                    showToast(`Error: ${data.detail || data.message}`, 'error');
+                }
+            } catch (error) {
+                showToast(`Network error: ${error}`, 'error');
+            }
+        }
+
+        async function setServerFansAuto() {
+            try {
+                const response = await fetch(`${API_URL}/aimanager/serverfans`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: 'auto' })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    showToast('All server fans -> auto', 'success');
+                    fetchServerFans();
+                } else {
+                    showToast(`Error: ${data.detail || data.message}`, 'error');
+                }
+            } catch (error) {
+                showToast(`Network error: ${error}`, 'error');
+            }
+        }
+
+        async function fetchServerFans() {
+            try {
+                const response = await fetch(`${API_URL}/aimanager/serverfans`);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || "Failed to fetch server fans");
+
+                const statusEl = document.getElementById('serverFanStatus');
+                const fans = data.fans || [];
+                if (fans.length === 0) {
+                    statusEl.textContent = 'No server fan data available';
+                } else {
+                    statusEl.textContent = fans.map(f =>
+                        `${f.index}: ${f.rpm != null ? f.rpm : '?'} RPM (${f.percent != null ? f.percent : '?'}%)` +
+                        (f.enable_label ? ` ${f.enable_label}` : '')
+                    ).join(' · ');
+                }
+
+                const tempsEl = document.getElementById('serverTemps');
+                if (data.temps && data.temps.length) {
+                    tempsEl.textContent = 'Server temps: ' +
+                        data.temps.map(t => `${t.label}: ${t.temp_c}°C`).join(', ');
+                } else {
+                    tempsEl.textContent = '';
+                }
+            } catch (error) {
+                document.getElementById('serverFanStatus').textContent = 'Server fans unavailable: ' + error.message;
+            }
+        }
+
+        document.getElementById('serverFanSlider').addEventListener('input', () => {
+            document.getElementById('serverFanValue').textContent = document.getElementById('serverFanSlider').value + '%';
+        });
+        document.getElementById('serverFanApply').addEventListener('click', applyServerFans);
+        document.getElementById('serverFanAuto').addEventListener('click', setServerFansAuto);
+
+        async function clearVram() {
+            try {
+                const response = await fetch(`${API_URL}/aimanager/clear`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    showToast(data.message, 'success');
+                    fetchLoaded();
+                } else {
+                    showToast(`Error: ${data.detail || data.message}`, 'error');
+                }
+            } catch (error) {
+                showToast(`Network error: ${error}`, 'error');
+            }
+        }
+
+        document.getElementById('clearVramBtn').addEventListener('click', () => {
+            showConfirm('Kill ALL processes using VRAM and unload all models?', clearVram, true);
+        });
+
+        async function fetchLoaded() {
+            try {
+                const response = await fetch(`${API_URL}/aimanager/loaded`);
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.detail || "Failed to load running models");
+
+                const tbody = document.querySelector('#loadedTable tbody');
+                tbody.innerHTML = '';
+
+                loadedNames.clear();
+                loadedCards.clear();
+                (data.models || []).forEach(model => {
+                    loadedNames.add(model.name);
+                    loadedCards.set(model.name, model.card);
+                });
+                refreshLoadedRows();
+
+                if (!data.models || data.models.length === 0) {
+                    const row = tbody.insertRow();
+                    const cell = row.insertCell(0);
+                    cell.colSpan = 5;
+                    cell.textContent = 'No models currently loaded';
+                    cell.style.textAlign = 'center';
+                    return;
+                }
+
+                const loadedLabels = ['Name', 'Size', 'Card', 'Processor', 'Context'];
+                data.models.forEach(model => {
+                    const row = tbody.insertRow();
+                    row.title = `Click to unload from ${model.card || 'card'}`;
+                    const values = [model.name, model.size, model.card, model.processor, model.context];
+                    values.forEach((value, i) => {
+                        const cell = row.insertCell(row.cells.length);
+                        cell.textContent = value || '';
+                        cell.dataset.label = loadedLabels[i];
+                    });
+                    row.addEventListener('click', () => {
+                        if (model.card === 'R9700') setSelectedCard(1);
+                        else setSelectedCard(0);
+                        confirmUnload(model.name);
+                    });
+                });
+            } catch (error) {
+                // Silent fail - table just won't show data
+            }
+        }
+
+        async function fetchModels() {
+            try {
+                const response = await fetch(`${API_URL}/aimanager/models`);
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.detail || "Failed to load models");
+
+                const tbody = document.querySelector('#modelsTable tbody');
+                tbody.innerHTML = '';
+
+                data.models.forEach(model => {
+                    const row = tbody.insertRow();
+                    row.title = 'Click to load';
+                    row.dataset.modelName = model.name;
+                    const nameCell = row.insertCell(0);
+                    const sizeCell = row.insertCell(1);
+
+                    nameCell.textContent = model.name;
+                    nameCell.dataset.label = 'Name';
+                    sizeCell.textContent = (model.size / (1024**3)).toFixed(2);
+                    sizeCell.dataset.label = 'Size (GB)';
+
+                    row.addEventListener('click', () => confirmLoad(model.name));
+                });
+                refreshLoadedRows();
+            } catch (error) {
+                showToast(`Error loading models: ${error.message}`, 'error');
+            }
+        }
+
+        function fmtBytes(bytes) {
+            if (bytes === null || bytes === undefined || bytes === 'N/A') return '—';
+            if (typeof bytes === 'string') return bytes;
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let i = 0, v = bytes;
+            while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+            return v.toFixed(v >= 100 ? 0 : 1) + ' ' + units[i];
+        }
+
+        function fmtMB(mb) {
+            if (mb === null || mb === undefined) return '—';
+            return fmtBytes(mb * 1024 * 1024);
+        }
+
+        function utilClass(pct) {
+            if (pct === null || pct === undefined || pct === 'N/A') return '';
+            if (pct >= 90) return 'util-high';
+            if (pct >= 60) return 'util-med';
+            return 'util-low';
+        }
+
+        async function fetchGpu() {
+            try {
+                const response = await fetch(`${API_URL}/aimanager/gpu`);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || "Failed to fetch GPU status");
+
+                const gpuBody = document.querySelector('#gpuTable tbody');
+                gpuBody.innerHTML = '';
+                if (!data.gpus || data.gpus.length === 0) {
+                    const row = gpuBody.insertRow();
+                    const cell = row.insertCell(0);
+                    cell.colSpan = 9;
+                    cell.textContent = data.error || 'No GPU data available';
+                    cell.style.textAlign = 'center';
+                    return;
+                }
+
+                data.gpus.forEach(g => {
+                    const row = gpuBody.insertRow();
+
+                    const gpuCell = row.insertCell(0);
+                    gpuCell.textContent = g.gpu;
+                    gpuCell.dataset.label = 'GPU';
+
+                    const nameCell = row.insertCell(1);
+                    nameCell.textContent = g.name;
+                    nameCell.dataset.label = 'Name';
+
+                    const gfxCell = row.insertCell(2);
+                    gfxCell.textContent = g.gfx_util != null ? `${g.gfx_util} %` : '—';
+                    gfxCell.className = 'cell-center ' + utilClass(g.gfx_util);
+                    gfxCell.dataset.label = 'GFX Util';
+
+                    const vramCell = row.insertCell(3);
+                    const vramPct = (g.vram_total > 0) ? (g.vram_used / g.vram_total * 100) : 0;
+                    vramCell.innerHTML = `${fmtMB(g.vram_used)} / ${fmtMB(g.vram_total)}` +
+                        `<span class="${utilClass(vramPct)}"> (${vramPct.toFixed(0)}%)</span>`;
+                    vramCell.dataset.label = 'VRAM';
+
+                    const tempCell = row.insertCell(4);
+                    const temps = [g.temp_edge, g.temp_hotspot, g.temp_mem]
+                        .filter(v => v !== null && v !== undefined && v !== 'N/A');
+                    tempCell.textContent = temps.length ? temps.map(v => `${v}°C`).join(' / ') : '—';
+                    tempCell.dataset.label = 'Temp';
+                    if (g.temp_hotspot != null && g.temp_hotspot >= 95) tempCell.classList.add('temp-high');
+
+                    const powerCell = row.insertCell(5);
+                    powerCell.textContent = g.power != null ? `${g.power} W` : '—';
+                    powerCell.dataset.label = 'Power';
+
+                    const fanCell = row.insertCell(6);
+                    const fanParts = [];
+                    if (g.fan_rpm != null && g.fan_rpm !== 'N/A') fanParts.push(`${g.fan_rpm} RPM`);
+                    if (g.fan_pct != null && g.fan_pct !== 'N/A') fanParts.push(`${Math.round(g.fan_pct)}%`);
+                    fanCell.textContent = fanParts.length ? fanParts.join(' ') : '—';
+                    fanCell.dataset.label = 'Fan';
+
+                    const clkCell = row.insertCell(7);
+                    clkCell.textContent =
+                        (g.gfx_clk != null ? `${g.gfx_clk}` : '—') + ' / ' +
+                        (g.mem_clk != null ? `${g.mem_clk} MHz` : '—');
+                    clkCell.dataset.label = 'Clocks';
+
+                    const thrCell = row.insertCell(8);
+                    thrCell.textContent = g.throttle_status && g.throttle_status !== 'N/A' ? g.throttle_status : '—';
+                    thrCell.dataset.label = 'Throttle';
+                    if (g.throttle_status && g.throttle_status !== 'N/A' && g.throttle_status !== 'NORMAL') {
+                        thrCell.className = 'throttle-on';
+                    }
+                });
+
+                const procBody = document.querySelector('#gpuProcTable tbody');
+                procBody.innerHTML = '';
+                if (!data.processes || data.processes.length === 0) {
+                    const row = procBody.insertRow();
+                    const cell = row.insertCell(0);
+                    cell.colSpan = 7;
+                    cell.textContent = 'No processes using GPU';
+                    cell.style.textAlign = 'center';
+                } else {
+                    data.processes.forEach(p => {
+                        const row = procBody.insertRow();
+
+                        const procGpu = row.insertCell(0);
+                        procGpu.textContent = p.gpu;
+                        procGpu.dataset.label = 'GPU';
+
+                        const pidCell = row.insertCell(1);
+                        pidCell.textContent = p.pid;
+                        pidCell.dataset.label = 'PID';
+
+                        const pnameCell = row.insertCell(2);
+                        pnameCell.textContent = p.name;
+                        pnameCell.dataset.label = 'Process';
+
+                        const gttCell = row.insertCell(3);
+                        gttCell.textContent = fmtBytes(p.gtt_mem);
+                        gttCell.dataset.label = 'GTT MEM';
+
+                        const vramCell = row.insertCell(4);
+                        vramCell.textContent = fmtBytes(p.vram_mem);
+                        vramCell.dataset.label = 'VRAM MEM';
+
+                        const memCell = row.insertCell(5);
+                        memCell.textContent = fmtBytes(p.mem_usage);
+                        memCell.dataset.label = 'MEM USAGE';
+
+                        const cuCell = row.insertCell(6);
+                        cuCell.textContent =
+                            (p.cu_occupancy != null && p.cu_occupancy !== 'N/A') ? p.cu_occupancy : '—';
+                        cuCell.dataset.label = 'CU %';
+                    });
+                }
+
+                if (data.updated_at) {
+                    document.getElementById('gpuUpdated').textContent =
+                        'updated ' + new Date(data.updated_at * 1000).toLocaleTimeString();
+                }
+            } catch (error) {
+                // Silent fail - table just won't show data
+            }
+        }
+
+        async function refreshTerminal() {
+            const body = document.getElementById('terminalBody');
+            const status = document.getElementById('terminalStatus');
+            try {
+                const response = await fetch(`${API_URL}/aimanager/terminal`);
+                const text = await response.text();
+                if (response.ok) {
+                    body.textContent = text.trim() || '(no output)';
+                    status.textContent = '● live';
+                    status.className = 'terminal-status live';
+                    body.scrollTop = body.scrollHeight;
+                } else {
+                    status.textContent = 'error';
+                    status.className = 'terminal-status offline';
+                    body.textContent = text || 'Failed to fetch terminal output';
+                }
+            } catch (error) {
+                status.textContent = 'offline';
+                status.className = 'terminal-status offline';
+                body.textContent = 'Cannot reach server: ' + error;
+            }
+        }
+
+        function initToggles() {
+            const toggles = [
+                ['gpuToggle', 'gpuTableWrap'],
+                ['gpuProcToggle', 'gpuProcTableWrap']
+            ];
+            toggles.forEach(([btnId, wrapId]) => {
+                const btn = document.getElementById(btnId);
+                const wrap = document.getElementById(wrapId);
+                if (!btn || !wrap) return;
+                wrap.style.display = 'none';
+                btn.classList.remove('expanded');
+                btn.addEventListener('click', () => {
+                    const hidden = wrap.style.display === 'none';
+                    wrap.style.display = hidden ? '' : 'none';
+                    btn.classList.toggle('expanded', hidden);
+                });
+            });
+        }
+
+        // Initial loads
+        initOpenWebUiButton();
+        initToggles();
+        fetchModels();
+        fetchLoaded();
+        fetchFan();
+        fetchServerFans();
+        fetchGpu();
+        refreshTerminal();
+
+        // Auto-refresh intervals
+        setInterval(fetchModels, 10000);
+        setInterval(fetchLoaded, 3000);
+        setInterval(fetchFan, 5000);
+        setInterval(fetchServerFans, 5000);
+        setInterval(fetchGpu, 2000);
+        setInterval(refreshTerminal, 2000);
+    </script>
+</body>
+</html>

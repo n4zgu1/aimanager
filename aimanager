@@ -1,0 +1,117 @@
+#!/bin/bash
+# aimanager - CLI for managing local AI models loaded into VRAM.
+# Talks to the aimanager HTTP service (default http://localhost:22345/aimanager).
+
+BASE="${AIMANAGER_URL:-http://localhost:22345/aimanager}"
+
+usage() {
+    cat <<EOF
+Usage: aimanager <command> [args]
+
+Commands:
+  list              List all available models (ollama list)
+  loaded            Show models currently in VRAM (ollama ps)
+  load <model>      Load a model into VRAM (kept loaded until changed)
+  unload <model>    Unload a model from VRAM
+  current           Show the currently loaded model name
+  gpu               Show current amd-smi GPU snapshot
+  fan [0-100|reset] Get or set GPU fan speed
+  help              Show this help
+
+Examples:
+  aimanager list
+  aimanager loaded
+  aimanager load qwen3.5:4b
+  aimanager unload qwen3.5:4b
+  aimanager current
+  aimanager fan
+  aimanager fan 60
+  aimanager fan reset
+
+The service URL can be overridden with AIMANAGER_URL.
+EOF
+}
+
+fail() {
+    echo "error: $1" >&2
+    exit 1
+}
+
+cmd_list() {
+    curl -s "$BASE/models" | jq -r '.models[] | .name' 2>/dev/null \
+        || fail "could not fetch models (is the service running?)"
+}
+
+cmd_loaded() {
+    curl -s "$BASE/loaded" | jq -r '.models[] | "\(.name)\t\(.size)\t\(.processor)\t\(.context)"' 2>/dev/null \
+        || fail "could not fetch loaded models (is the service running?)"
+}
+
+cmd_load() {
+    local model="$1"
+    [ -n "$model" ] || fail "usage: aimanager load <model>"
+    local resp
+    resp=$(curl -s -X POST "$BASE/load" -H "Content-Type: application/json" \
+        -d "{\"model\": \"$model\"}") \
+        || fail "request failed"
+    echo "$resp" | jq -r '.message // .detail' 2>/dev/null || echo "$resp"
+    echo "$resp" | jq -r '.model | "Loaded: \(.name) | Size: \(.size) | Processor: \(.processor) | Context: \(.context)"' 2>/dev/null
+}
+
+cmd_unload() {
+    local model="$1"
+    [ -n "$model" ] || fail "usage: aimanager unload <model>"
+    local resp
+    resp=$(curl -s -X POST "$BASE/unload" -H "Content-Type: application/json" \
+        -d "{\"model\": \"$model\"}") \
+        || fail "request failed"
+    echo "$resp" | jq -r '.message // .detail' 2>/dev/null || echo "$resp"
+}
+
+cmd_current() {
+    local resp
+    resp=$(curl -s "$BASE/current")
+    local model
+    model=$(echo "$resp" | jq -r '.model // empty' 2>/dev/null)
+    if [ -n "$model" ]; then
+        echo "Currently loaded: $model"
+    else
+        echo "No model currently loaded"
+    fi
+}
+
+cmd_gpu() {
+    curl -s "$BASE/terminal" || fail "could not fetch GPU stats"
+}
+
+cmd_fan() {
+    local arg="$1"
+    if [ -z "$arg" ]; then
+        local status
+        status=$(curl -s "$BASE/fan")
+        echo "$status" | jq -r '"Fan: \(.rpm // "n/a") RPM, PWM \(.pwm // "n/a")%"' 2>/dev/null \
+            || echo "$status"
+        return
+    fi
+    if [ "$arg" = "reset" ]; then
+        curl -s -X POST "$BASE/fan" -H "Content-Type: application/json" -d '{"reset": true}' \
+            | jq -r '.message // .detail' 2>/dev/null
+    elif [[ "$arg" =~ ^[0-9]+$ ]]; then
+        curl -s -X POST "$BASE/fan" -H "Content-Type: application/json" -d "{\"percent\": $arg}" \
+            | jq -r '.message // .detail' 2>/dev/null
+    else
+        fail "usage: aimanager fan [0-100|reset]"
+    fi
+}
+
+case "${1:-help}" in
+    list|ls)            cmd_list ;;
+    loaded|running)     cmd_loaded ;;
+    load)               cmd_load "$2" ;;
+    unload)             cmd_unload "$2" ;;
+    current|status)     cmd_current ;;
+    gpu|terminal)       cmd_gpu ;;
+    fan)                cmd_fan "$2" ;;
+    help|-h|--help)     usage ;;
+    *)                  usage; [ "$1" = "help" ] || exit 1 ;;
+esac
